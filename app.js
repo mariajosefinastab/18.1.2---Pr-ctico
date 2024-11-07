@@ -15,15 +15,15 @@ const port = 3000;
 app.use(express.json());
 
 app.get("/", (req, res) => {
-  res.send("<h1>Bienvenid@ al servidor</h1>");
+  res.send("<h1>Bienvenid@ al servidor de Task</h1>");
 });
 
-app.get("/people", async (req, res) => {
+app.get("/tasks", async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
     const rows = await conn.query(
-      "SELECT id, name, lastname, email FROM people"
+      "SELECT id, name, description, created_at, updated_at, status FROM todo"
     );
 
     res.json(rows);
@@ -34,12 +34,12 @@ app.get("/people", async (req, res) => {
   }
 });
 
-app.get("/people/:id", async (req, res) => {
+app.get("/tasks/:id", async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
     const rows = await conn.query(
-      "SELECT id, name, lastname, email FROM people WHERE id=?",
+      "SELECT id, name, description, created_at, updated_at, status FROM todo WHERE id=?",
       [req.params.id]
     );
 
