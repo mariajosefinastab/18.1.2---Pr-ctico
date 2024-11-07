@@ -39,7 +39,7 @@ app.get("/tasks/:id", async (req, res) => {
   try {
     conn = await pool.getConnection();
     const rows = await conn.query(
-      "SELECT id, name, description, created_at, updated_at, status FROM todo WHERE id=?",
+      "SELECT * FROM todo WHERE id=?", //¿?
       [req.params.id]
     );
 
