@@ -10,7 +10,7 @@ const pool = mariadb.createPool({
 });
 
 const app = express();
-const port = 3000;
+const port = 3008;
 
 app.use(express.json());
 
@@ -18,6 +18,8 @@ app.get("/", (req, res) => {
   res.send("<h1>Bienvenid@ al servidor de Task</h1>");
 });
 
+
+//Todas las tareas
 app.get("/tasks", async (req, res) => {
   let conn;
   try {
@@ -34,6 +36,7 @@ app.get("/tasks", async (req, res) => {
   }
 });
 
+//Tarea por ID
 app.get("/tasks/:id", async (req, res) => {
   let conn;
   try {
@@ -45,63 +48,110 @@ app.get("/tasks/:id", async (req, res) => {
 
     res.json(rows[0]);
   } catch (error) {
-    res.status(500).json({ message: "Se rompió el servidor" });
+    res.status(404).json({ message: "Tarea no encontrada por ID" });
   } finally {
     if (conn) conn.release(); //release to pool
   }
 });
 
-app.post("/people", async (req, res) => {
+//Nueva tarea, valido si esa tarea existe y su estado, sino la agrego
+app.post("/tasks", async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
+    const { name, description, status } = req.body;
+
+    //valida status
+
+    const validStatuses = ["TO_DO", "IN_PROGRESS", "DONE"];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ message: "Estado inválido" });
+    }
+
     const response = await conn.query(
-      `INSERT INTO people(name, lastname, email) VALUE(?, ?, ?)`,
-      [req.body.name, req.body.lastname, req.body.email]
+      `INSERT INTO todo(name, description, status) VALUES (?, ?, ?)`,
+      [name, description, status]
     );
 
-    res.json({ id: parseInt(response.insertId), ...req.body });
+    res.json({
+      id: response.insertId,
+      name,
+      description,
+      status,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Se rompió el servidor" });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+
+// Actualizar una tarea por id
+app.put("/tasks/:id", async (req, res) => {
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const { name, description, status } = req.body;
+    const taskId = req.params.id;
+
+    const validStatuses = ["TO_DO", "IN_PROGRESS", "DONE"];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({ message: "Estado inválido" });
+    }
+
+    const response = await conn.query(
+      `UPDATE todo SET name=?, description=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+      [name, description, status, taskId]
+    );
+
+    if (response.affectedRows === 0) {
+      return res.status(404).json({ message: "Tarea no encontrada" });
+    }
+
+    res.json({
+      id: taskId,
+      name,
+      description,
+      status,
+      updated_at: new Date().toISOString(),
+    });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Se rompió el servidor" });
   } finally {
-    if (conn) conn.release(); //release to pool
+    if (conn) conn.release();
   }
 });
 
-app.put("/people/:id", async (req, res) => {
+
+// Eliminar una tarea por id
+app.delete("/tasks/:id", async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
-    const response = await conn.query(
-      `UPDATE people SET name=?, lastname=?, email=? WHERE id=?`,
-      [req.body.name, req.body.lastname, req.body.email, req.params.id]
-    );
+    const taskId = req.params.id;
 
-    res.json({ id: req.params.id, ...req.body });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Se rompió el servidor" });
-  } finally {
-    if (conn) conn.release(); //release to pool
-  }
-});
-
-app.delete("/people/:id", async (req, res) => {
-  let conn;
-  try {
-    conn = await pool.getConnection();
-    const rows = await conn.query("DELETE FROM people WHERE id=?", [
-      req.params.id,
+    const response = await conn.query("DELETE FROM todo WHERE id=?", [
+      taskId,
     ]);
-    res.json({ message: "Elemento eliminado correctamente" });
+
+    if (response.affectedRows === 0) {
+      return res.status(404).json({ message: "Tarea no encontrada" });
+    }
+
+    res.json({ message: "Tarea eliminada correctamente" });
   } catch (error) {
     res.status(500).json({ message: "Se rompió el servidor" });
   } finally {
-    if (conn) conn.release(); //release to pool
+    if (conn) conn.release(); 
   }
 });
 
+// Iniciar servidor
 app.listen(port, () => {
   console.log(`Servidor corriendo en http://localhost:${port}`);
 });
+
